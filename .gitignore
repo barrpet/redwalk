@@ -1,0 +1,16 @@
+# build directories
+build
+release
+debug
+
+# dependencies
+src/Eigen
+
+# testing data
+test/data
+
+# object files and executables
+*.o
+*.so
+*.a
+redwalk

@@ -1,0 +1,11 @@
+redwalk.pc:
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=${exec_prefix}/lib
+
+Name: redwalk
+Description: The redwalk library
+Version: @REDWALK_VERSION_NUMBER@
+Cflags: -I${includedir}/redwalk
+Libs: -L${libdir} -lredwalk
