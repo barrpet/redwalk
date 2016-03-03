@@ -9,8 +9,7 @@ src/Eigen
 # testing data
 test/data
 
-# object files and executables
+# binaries
 *.o
 *.so
 *.a
-redwalk
