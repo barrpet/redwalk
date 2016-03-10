@@ -1,0 +1,6 @@
+#ifndef REDWALK_MODULE
+#define REDWALK_MODULE
+
+#include "src/redwalk.hpp"
+
+#endif //REDWALK_MODULE

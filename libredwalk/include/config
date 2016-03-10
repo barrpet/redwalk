@@ -1,0 +1,7 @@
+#ifndef REDWALK_CONFIG_MODULE
+#define REDWALK_CONFIG_MODULE
+
+#include "src/config/macros.hpp"
+#include "src/config/openmp.hpp"
+
+#endif //REDWALK_CONFIG_MODULE
