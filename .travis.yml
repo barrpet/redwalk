@@ -1,1 +1,5 @@
 language: cpp
+
+script:
+  - ./configure && cd release
+  - make && make check
