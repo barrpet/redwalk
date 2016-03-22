@@ -1,7 +1,7 @@
 # redwalk
 
 [![Software License][ico-license]](LICENSE.md)
-[![Build Status][ico-travis]][link-travis]
+[![Build Status](https://travis-ci.org/barrpet/redwalk.svg?branch=master)](https://travis-ci.org/barrpet/redwalk)
 
 A C/C++ library and executable for network community detection.
 
