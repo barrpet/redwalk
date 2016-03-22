@@ -1,0 +1,291 @@
+#!/bin/bash
+
+function print_help {
+  echo "Usage: ./configure [--prefix=PREFIX]"
+  echo
+  echo "  --prefix=[/usr/local] redwalk installation target directory"
+  echo
+  echo "  --enable-debug        configure a separate debug build"
+  echo
+  echo "  --disable-openmp      disables OpenMP (disabled by default on OSX)"
+  echo "                          OpenMP will be disabled automatically if compiler support"
+  echo "                          is not detected"
+  echo
+  echo "  --disable-cli         do not build the redwalk cli executable"
+  echo "                          only build the libraries"
+  echo
+  echo "  --enable-docs         enable building of documentation"
+  echo "                          ignored if Doxygen not detected"
+  echo
+  echo "  -D var=value          specify definitions to be passed to cmake"
+  echo
+  echo "  --cleanup             remove all build directories and configuration output"
+  echo
+  echo "  --help                show this message and exit"
+
+  exit 0
+} # end of print help
+
+function run_cleanup {
+  #!/bin/bash
+  echo "This completely erases all build folders including dependencies!"
+  echo -n "Are you sure you want to continue [y/N]? "
+  read yesorno;
+  if [ "${yesorno:0:1}" == "y" ] || [ "${yesorno:0:1}" == "Y" ]; then
+    echo "Removing release and debug folders";
+    rm -rf release debug configure.deps config.log
+  else
+    echo "Doing nothing!";
+  fi
+  exit 1
+} # end of run cleanup
+
+function unknown_option {
+  echo "Unrecognized option: $1"
+  echo "To get help, run ./configure --help"
+  exit 1
+} # end of unknown options
+
+## Obtained from forum:
+# http://stackoverflow.com/questions/4023830/bash-how-compare-two-strings-in-version-format
+# Return  0 if version are equal
+# Returns 1 if version 1 is larger
+# Returns 2 if version 2 is larger
+function check_version {
+  if [[ $1 == $2 ]]
+  then
+      return 0
+  fi
+  local IFS=.
+  local i ver1=($1) ver2=($2)
+  # fill empty fields in ver1 with zeros
+  for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+  do
+      ver1[i]=0
+  done
+  for ((i=0; i<${#ver1[@]}; i++))
+  do
+      if [[ -z ${ver2[i]} ]]
+      then
+          # fill empty fields in ver2 with zeros
+          ver2[i]=0
+      fi
+      if ((10#${ver1[i]} > 10#${ver2[i]}))
+      then
+          return 1
+      fi
+      if ((10#${ver1[i]} < 10#${ver2[i]}))
+      then
+          return 2
+      fi
+  done
+  return 0
+}
+
+##=============================================================================
+## Main configuration processing
+
+## Define some defaults which are modified by the script and whatever
+## is defined in configure.deps
+RELEASE_DIR=release
+DEBUG_DIR=debug
+INSTALL_DIR=/usr/local
+REDWALK_HOME=$PWD
+DEPS_PREFIX=$PWD/deps
+NO_DEBUG=true
+NO_OPENMP=false
+NO_CLI=false
+NO_DOCS=true
+CFLAGS=""
+
+# if mac detected, force no_openmp flags by default
+if [[ $OSTYPE == darwin* ]]; then
+  NO_OPENMP=true
+fi
+
+## The defaults can be overwritten be editing the configure.deps file
+if [ -f configure.deps ]; then
+#  source configure.deps
+  # We delete the configure deps and then recreate it each time using
+  # the original values along with any modifications made by the
+  # configure logic.
+  rm configure.deps
+fi
+
+# Parse command line configure flags ------------------------------------------
+while [ $# -gt 0 ]
+  do case $1 in
+    --help)                 print_help=1 ;;
+    --cleanup)              run_cleanup=1 ;;
+    --enable-debug)         do_debug=1 ;;
+    --disable-openmp)       no_openmp=1 ;;
+    --disable-cli)          no_cli=1 ;;
+    --enable-docs)          do_docs=1 ;;
+    --prefix=*)             prefix=${1##--prefix=} ;;
+    -D)                     CFLAGS="$CFLAGS -D $2"; shift ;;
+    *) unknown_option $1 ;;
+  esac
+  shift
+done
+
+if [ $print_help ]; then
+  print_help;
+fi
+
+if [ $run_cleanup ]; then
+  run_cleanup
+fi
+
+if [ $no_openmp ]; then
+  NO_OPENMP=true
+fi
+
+if [ $no_cli ]; then
+  NO_CLI=true
+fi
+
+if [ $do_docs ]; then
+  DO_DOCS=true
+fi
+
+if [[ -n $prefix ]]; then
+  INSTALL_DIR=$prefix
+fi
+
+
+# If not specified we assume gcc and g++ are the default c and c++
+# compilers
+if [[ -z $CC ]]; then
+  CC=gcc
+fi
+if [[ -z $CXX ]]; then
+  CXX=g++
+fi
+
+## Begin logging in config.log
+LOG_FILE=config.log
+date | tee $LOG_FILE
+
+## ===================================================================
+## Setup CMake
+
+## Install cmake
+if [ `which cmake` ]; then
+  #test cmake version
+  echo "Testing existing cmake version..."
+  currentversion=`cmake --version | awk -F "patch" '{print $1;}' | tr -dc '[0-9].'`
+  echo "Detected $currentversion . Required 3.1.0"
+  check_version $currentversion "3.1.0"
+  if [ $? -ne 2 ]; then
+    echo "CMake version is good"
+    CMAKE="cmake"
+  fi
+fi
+
+# No cmake found
+if [ -z $CMAKE ]; then
+  echo "CMake not found or out of date: please install or update CMake to continue"
+  exit 1
+fi
+
+## ============================================================================
+# Regenerate the configure.deps
+echo -e "# Release build directory:" >> configure.deps
+echo -e "\t RELEASE_DIR=$RELEASE_DIR" >> configure.deps
+
+echo -e "# Debug build directory (optimization disabled):" >> configure.deps
+echo -e "\t DEBUG_DIR=$DEBUG_DIR" >> configure.deps
+
+echo -e "# Directory in which redwalk is installed (prefix):" >> configure.deps
+echo -e "\t INSTALL_DIR=$INSTALL_DIR" >> configure.deps
+
+echo -e "# The redwalk home directory: " >> configure.deps
+echo -e "\t REDWALK_HOME=$REDWALK_HOME" >> configure.deps
+
+echo -e "# The directory in which redwalk installs external dependencies:" >> configure.deps
+echo -e "\t DEPS_PREFIX=$DEPS_PREFIX" >> configure.deps
+
+echo -e "# Use OpenMP?: " >> configure.deps
+echo -e "\t NO_OPENMP=$NO_OPENMP" >> configure.deps
+
+echo -e "# Build cli executable?: " >> configure.deps
+echo -e "\t NO_CLI=$NO_CLI" >> configure.deps
+
+echo -e "# Enable building of documentation? " >> configure.deps
+echo -e "\t DO_DOCS=$DO_DOCS" >> configure.deps
+
+echo -e "# The c compiler to use: " >> configure.deps
+echo -e "\t CC=$CC" >> configure.deps
+
+echo -e "# The c++ compiler to use: " >> configure.deps
+echo -e "\t CXX=$CXX" >> configure.deps
+
+echo -e "# Any addition user defined CFLAGS: " >> configure.deps
+echo -e "\t CFLAGS=$CFLAGS" >> configure.deps
+
+echo -e "# The cmake binary used to geneate the project:" >> configure.deps
+echo -e "\t CMAKE=$CMAKE" >> configure.deps
+
+echo "======================= BUILD CONFIGURATION ========================"
+echo "System Information: " | tee -a $LOG_FILE
+uname -v | tee -a $LOG_FILE
+echo "Compiler Information: " | tee -a $LOG_FILE
+$CC --version      | tee -a $LOG_FILE
+$CXX --version     | tee -a $LOG_FILE
+$CMAKE --version   | tee -a $LOG_FILE
+
+echo "======================= CONFIG FILE ================================"
+cat configure.deps | tee -a $LOG_FILE
+
+
+### Add addition config flags =================================================
+CFLAGS="$CFLAGS -D NO_OPENMP:BOOL=$NO_OPENMP"
+CFLAGS="$CFLAGS -D NO_CLI:BOOL=$NO_CLI"
+CFLAGS="$CFLAGS -D DO_DOCS:BOOL=$DO_DOCS"
+CFLAGS="$CFLAGS -D CMAKE_INSTALL_PREFIX:STRING=$INSTALL_DIR"
+
+## ============================================================================
+# Run Cmake
+
+
+set -e
+set -o pipefail
+
+
+
+echo -e "\n\n\n======================= Release ========================" \
+    | tee -a $LOG_FILE
+
+if [ ! -d $RELEASE_DIR ]; then
+    mkdir $RELEASE_DIR
+fi
+cd $RELEASE_DIR
+rm -f CMakeCache.txt
+build_cmd="$CMAKE \
+    $GENERATOR \
+    -D CMAKE_BUILD_TYPE=Release \
+    $CFLAGS \
+    ../."
+echo $build_cmd | tee -a "../$LOG_FILE"
+eval $build_cmd | tee -a "../$LOG_FILE"
+cd $REDWALK_HOME
+
+
+if [ $do_debug ]; then
+  echo -e "\n\n\n======================= Debug =========================" \
+      | tee -a $LOG_FILE
+
+  if [ ! -d $DEBUG_DIR ]; then
+      mkdir $DEBUG_DIR
+  fi
+  cd $DEBUG_DIR
+  rm -f CMakeCache.txt
+  build_cmd="$CMAKE \
+      $GENERATOR \
+      -D CMAKE_BUILD_TYPE=Debug \
+      $CFLAGS \
+      ../."
+  echo $build_cmd | tee -a ../$LOG_FILE
+  eval $build_cmd | tee -a ../$LOG_FILE
+  cd $REDWALK_HOME
+fi
