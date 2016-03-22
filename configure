@@ -174,8 +174,8 @@ if [ `which cmake` ]; then
   #test cmake version
   echo "Testing existing cmake version..."
   currentversion=`cmake --version | awk -F "patch" '{print $1;}' | tr -dc '[0-9].'`
-  echo "Detected $currentversion . Required 3.1.0"
-  check_version $currentversion "3.1.0"
+  echo "Detected $currentversion . Required 2.8.7"
+  check_version $currentversion "2.8.7"
   if [ $? -ne 2 ]; then
     echo "CMake version is good"
     CMAKE="cmake"
