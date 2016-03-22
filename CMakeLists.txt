@@ -1,5 +1,5 @@
 project(REDWALK CXX)
-cmake_minimum_required(VERSION 3.1.0)
+cmake_minimum_required(VERSION 2.8.0)
 
 # guard against in-source builds
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
